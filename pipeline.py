@@ -16,10 +16,7 @@ def pipeline():
     args = get_args()
 
     qsub_params = [
-        '-l', 'jobtype=serial',
-        '-l', 'select=1:ncpus=1:mem=1gb',
         '-l', 'place=pack:shared',
-        '-l', 'walltime=01:00:00',
         '-M', 'jklynch@email.arizona.edu',
         '-m', 'bea',
         '-q', 'standard',
@@ -63,6 +60,12 @@ def pipeline():
             """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path)
         ),
         job_name='translate',
+        select=1,
+        ncpus=1,
+        mem='10gb',
+        pcmem='10gb',
+        walltime='00:05:00',
+        cputime='00:05:00',
         stderr_fp='mouse_translate.stderr',
         stdout_fp='mouse_translate.stdout',
         qsub_params=qsub_params
@@ -74,14 +77,20 @@ def pipeline():
     qsub_script(
         write_script(script_path=os.path.join(args.work_dir, 'script', 'cluster_proteins.sh'), script_text="""\
             #!/bin/bash
-            module load cdhit
+            module load cd-hit
             cdhit \\
                 -i {work_dir}/crc-mouse-protein-from-known-only.fa \\
                 -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
-                -c 0.9 -n 5 -M 1000 -d 0 -T 1
+                -c 0.9 -n 5 -M 1000 -d 0 -T 0
             """.format(**vars(args))
         ),
         job_name='cdhit',
+        select=1,
+        ncpus=28,
+        mem='168gb',
+        pcmem='6gb',
+        walltime='01:00:00',
+        cputime='28:00:00',
         stderr_fp='mouse_cluster.stderr',
         stdout_fp='mouse_cluster.stdout',
         qsub_params=qsub_params
@@ -116,9 +125,16 @@ def run_script(script_path):
     print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
     print('stdout:\n{}'.format(p.stdout.decode('utf-8')))
 
-def qsub_script(script_path, job_name, stderr_fp, stdout_fp, qsub_params):
+def qsub_script(script_path, job_name, select, ncpus, mem, pcmem, walltime, cputime, stderr_fp, stdout_fp, qsub_params):
     print('qsub "{}"'.format(script_path))
-    subprocess_cmd_list = ['qsub', '-N', job_name, '-e', stderr_fp, '-o', stdout_fp] + qsub_params + [script_path]
+    subprocess_cmd_list = [
+        'qsub',
+        '-N', job_name,
+        '-l', 'select={}:ncpus={}:mem={}:pcmem={}'.format(select, ncpus, mem, pcmem),
+        '-l', 'walltime={}'.format(walltime),
+        '-l', 'cputime={}'.format(cputime),
+        '-e', stderr_fp,
+        '-o', stdout_fp] + qsub_params + [script_path]
     print(subprocess_cmd_list)
     p = subprocess.run(
         subprocess_cmd_list,
