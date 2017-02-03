@@ -17,13 +17,13 @@ def pipeline():
 
     qsub_params = [
         '-l', 'jobtype=serial',
-        '-l', 'select=1:ncpus=1:mem=1gb'
+        '-l', 'select=1:ncpus=1:mem=1gb',
         '-l', 'place=pack:shared',
         '-l', 'walltime=01:00:00',
         '-M', 'jklynch@email.arizona.edu',
         '-m', 'bea',
         '-q', 'standard',
-        '-W', 'group_list=bhurwitz',
+        '-W', 'group_list=bhurwitz'
     ]
 
     work_script_dir = os.path.join(args.work_dir, 'script')
@@ -111,11 +111,11 @@ def run_script(script_path):
 
 def qsub_script(script_path, job_name, qsub_params):
     print('qsub "{}"'.format(script_path))
-    subprocess_cmd_list = ['qsub', script_path, '-N', job_name] + qsub_params
+    subprocess_cmd_list = ['qsub', '-N', job_name] + qsub_params + [script_path]
     print(subprocess_cmd_list)
     p = subprocess.run(
         subprocess_cmd_list,
-        shell=True,
+        shell=False,
         stderr=subprocess.PIPE,
         stdout=subprocess.PIPE)
     print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
