@@ -36,7 +36,7 @@ def pipeline():
     ###########################################################################
     # copy Scott's original data file
     if os.path.exists(work_dna_cds_known_path):
-        print('"{}" has already exists'.format(work_dna_cds_known_path))
+        print('"{}" already exists'.format(work_dna_cds_known_path))
     else:
         run_script(
             write_script(script_path=os.path.join(args.work_dir, 'script', 'copy.sh'), script_text="""\
@@ -63,6 +63,8 @@ def pipeline():
             """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path)
         ),
         job_name='translate',
+        stderr_fp='mouse_translate.stderr',
+        stdout_fp='mouse_translate.stdout',
         qsub_params=qsub_params
     )
     ###########################################################################
@@ -80,6 +82,8 @@ def pipeline():
             """.format(**vars(args))
         ),
         job_name='cdhit',
+        stderr_fp='mouse_cluster.stderr',
+        stdout_fp='mouse_cluster.stdout',
         qsub_params=qsub_params
     )
     ###########################################################################
@@ -112,9 +116,9 @@ def run_script(script_path):
     print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
     print('stdout:\n{}'.format(p.stdout.decode('utf-8')))
 
-def qsub_script(script_path, job_name, qsub_params):
+def qsub_script(script_path, job_name, stderr_fp, stdout_fp, qsub_params):
     print('qsub "{}"'.format(script_path))
-    subprocess_cmd_list = ['qsub', '-N', job_name] + qsub_params + [script_path]
+    subprocess_cmd_list = ['qsub', '-N', job_name, '-e', stderr_fp, '-o', stdout_fp] + qsub_params + [script_path]
     print(subprocess_cmd_list)
     p = subprocess.run(
         subprocess_cmd_list,
