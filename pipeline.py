@@ -35,15 +35,18 @@ def pipeline():
 
     ###########################################################################
     # copy Scott's original data file
-    run_script(
-        write_script(script_path=os.path.join(args.work_dir, 'script', 'copy.sh'), script_text="""\
-            #!/bin/bash
-            pwd
-            mkdir -p {work_dir}
-            cp {orig_dna_cds_known_path} {work_dna_cds_known_path}
-            """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path)
+    if os.path.exists(work_dna_cds_known_path):
+        print('"{}" has already exists'.format(work_dna_cds_known_path))
+    else:
+        run_script(
+            write_script(script_path=os.path.join(args.work_dir, 'script', 'copy.sh'), script_text="""\
+                #!/bin/bash
+                pwd
+                mkdir -p {work_dir}
+                cp {orig_dna_cds_known_path} {work_dna_cds_known_path}
+                """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path)
+            )
         )
-    )
     ###########################################################################
 
     ###########################################################################
