@@ -34,53 +34,60 @@ def pipeline():
     if os.path.exists(work_dna_cds_known_path):
         print('"{}" already exists'.format(work_dna_cds_known_path))
     else:
-        run_script(
-            write_script(script_path=os.path.join(work_scripts_dir, 'copy.sh'), script_text="""\
-                #!/bin/bash
-                pwd
-                mkdir -p {work_dir}
-                cp {orig_dna_cds_known_path} {work_dna_cds_known_path}
-                """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path),
-                 job_name='crc-mouse-copy',
-                 select=1,
-                 ncpus=1,
-                 mem='6gb',
-                 pcmem='6gb',
-                 place='free:shared',
-                 walltime='00:10:00',
-                 cput='00:10:00',
-                 stderr_fp='crc-mouse-copy.stderr',
-                 stdout_fp='crc-mouse-copy.stdout',
-                 qsub_params=qsub_params
-            )
+        copy_script_path = os.path.join(work_scripts_dir, 'copy.sh')
+        write_script(script_path=copy_script_path, script_text="""\
+            #!/bin/bash
+            pwd
+            mkdir -p {work_dir}
+            cp {orig_dna_cds_known_path} {work_dna_cds_known_path}
+            """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path),
+             job_name='crc-mouse-copy',
+             select=1,
+             ncpus=1,
+             mem='6gb',
+             pcmem='6gb',
+             place='free:shared',
+             walltime='00:10:00',
+             cput='00:10:00',
+             stderr_fp='crc-mouse-copy.stderr',
+             stdout_fp='crc-mouse-copy.stdout',
+             qsub_params=qsub_params
         )
+        if args.submit:
+            qsub_script(script_path=copy_script_path)
+        else:
+            print('"{}" will not be submitted'.format(copy_script_path))
     ###########################################################################
 
     ###########################################################################
     # translate dna to protein
-    translate_job_id, _ = qsub_script(
-        write_script(script_path=os.path.join(work_scripts_dir, 'translate.sh'), script_text= """\
-            #!/bin/bash
-            source activate mouse
-            python {scripts_dir}/translate-microbial-dna-CDS.py \\
-                -i {work_dna_cds_known_path} \\
-                -o {work_dir}/crc-mouse-protein-from-known-only.fa \\
-                -u {work_dir}/crc-mouse-untranslated-microbial-dna-CDS-known.fa \\
-                -l {translation_limit}
-            """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path),
-            job_name='crc-mouse-translate',
-            select=1,
-            ncpus=1,
-            mem='6gb',
-            pcmem='6gb',
-            place='pack:shared',
-            walltime='02:00:00',
-            cput='02:00:00',
-            stderr_fp='mouse_translate.stderr',
-            stdout_fp='mouse_translate.stdout',
-            qsub_params=qsub_params
-        )
+    translate_script_path = os.path.join(work_scripts_dir, 'translate.sh')
+    write_script(script_path=translate_script_path, script_text= """\
+        #!/bin/bash
+        source activate mouse
+        python {scripts_dir}/translate-microbial-dna-CDS.py \\
+            -i {work_dna_cds_known_path} \\
+            -o {work_dir}/crc-mouse-protein-from-known-only.fa \\
+            -u {work_dir}/crc-mouse-untranslated-microbial-dna-CDS-known.fa \\
+            -l {translation_limit}
+        """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path),
+        job_name='crc-mouse-translate',
+        select=1,
+        ncpus=1,
+        mem='6gb',
+        pcmem='6gb',
+        place='pack:shared',
+        walltime='02:00:00',
+        cput='02:00:00',
+        stderr_fp='mouse_translate.stderr',
+        stdout_fp='mouse_translate.stdout',
+        qsub_params=qsub_params
     )
+    if args.submit:
+        translate_job_id, _ = qsub_script(script_path=translate_script_path)
+    else:
+        print('"{}" will not be submitted'.format(translate_script_path))
+        translate_job_id = None
     ###########################################################################
 
     ###########################################################################
@@ -89,28 +96,32 @@ def pipeline():
     #     $ git clone https://github.com/weizhongli/cdhit.git
     #     $ cd cdhit
     #     $ make
-    qsub_script(
-        write_script(script_path=os.path.join(work_scripts_dir, 'cluster_proteins.sh'), script_text="""\
-            #!/bin/bash
-            {cd_hit_bin} \\
-                -i {work_dir}/crc-mouse-protein-from-known-only.fa \\
-                -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
-                -c 0.9 -n 5 -M 168000000 -d 0 -T 28
-            """.format(**vars(args)),
-            depend=translate_job_id,
-            job_name='crc-mouse-cdhit',
-            select=1,
-            ncpus=28,
-            mem='168gb',
-            pcmem='6gb',
-            place='pack:shared',
-            walltime='03:00:00',
-            cput='28:00:00',
-            stderr_fp='mouse_cluster.stderr',
-            stdout_fp='mouse_cluster.stdout',
-            qsub_params=qsub_params
-        )
+    cluster_script_path = os.path.join(work_scripts_dir, 'cluster_proteins.sh')
+    write_script(script_path=cluster_script_path, script_text="""\
+        #!/bin/bash
+        {cd_hit_bin} \\
+            -i {work_dir}/crc-mouse-protein-from-known-only.fa \\
+            -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
+            -c 0.9 -n 5 -M 168000000 -d 0 -T 28
+        """.format(**vars(args)),
+        depend=translate_job_id,
+        job_name='crc-mouse-cdhit',
+        select=1,
+        ncpus=28,
+        mem='168gb',
+        pcmem='6gb',
+        place='pack:shared',
+        walltime='03:00:00',
+        cput='28:00:00',
+        stderr_fp='mouse_cluster.stderr',
+        stdout_fp='mouse_cluster.stdout',
+        qsub_params=qsub_params
     )
+    if args.submit:
+        cluster_job_id, _ = qsub_script(script_path=cluster_script_path)
+    else:
+        print('"{}" will not be submitted'.format(cluster_script_path))
+        cluster_job_id = None
     ###########################################################################
 
 
@@ -123,8 +134,11 @@ def get_args():
         default='/rsgrps/bhurwitz/scottdaniel/extract-fasta/data/dna-of-CDS-from-known-only.fa')
     arg_parser.add_argument('-l', '--translation-limit', type=int, default=-1)
     arg_parser.add_argument('--cd-hit-bin', default='~/local/cdhit/cd-hit')
+    arg_parser.add_argument('--submit', action='store_true', default=False)
 
-    return arg_parser.parse_args()
+    args = arg_parser.parse_args()
+    print(args)
+    return args
 
 
 def write_script(script_path, script_text, **kwargs):
