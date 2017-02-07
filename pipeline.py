@@ -7,7 +7,6 @@
 import argparse
 import os
 import io
-import itertools
 import stat
 import subprocess
 
@@ -23,9 +22,9 @@ def pipeline():
         '-W', 'group_list=bhurwitz'
     ]
 
-    work_script_dir = os.path.join(args.work_dir, 'script')
-    if not os.path.exists(work_script_dir):
-        os.makedirs(work_script_dir)
+    work_scripts_dir = os.path.join(args.work_dir, 'scripts')
+    if not os.path.exists(work_scripts_dir):
+        os.makedirs(work_scripts_dir)
 
     _, dna_cds_known_file_name = os.path.split(args.orig_dna_cds_known_path)
     work_dna_cds_known_path = os.path.join(args.work_dir, dna_cds_known_file_name)
@@ -36,12 +35,22 @@ def pipeline():
         print('"{}" already exists'.format(work_dna_cds_known_path))
     else:
         run_script(
-            write_script(script_path=os.path.join(args.work_dir, 'script', 'copy.sh'), script_text="""\
+            write_script(script_path=os.path.join(work_scripts_dir, 'copy.sh'), script_text="""\
                 #!/bin/bash
                 pwd
                 mkdir -p {work_dir}
                 cp {orig_dna_cds_known_path} {work_dna_cds_known_path}
-                """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path)
+                """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path),
+                 job_name='crc-mouse-copy',
+                 select=1,
+                 ncpus=1,
+                 mem='10gb',
+                 pcmem='10gb',
+                 walltime='00:05:00',
+                 cputime='00:05:00',
+                 stderr_fp='crc-mouse-copy.stderr',
+                 stdout_fp='crc-mouse-copy.stdout',
+                 qsub_params=qsub_params
             )
         )
     ###########################################################################
@@ -49,7 +58,7 @@ def pipeline():
     ###########################################################################
     # translate dna to protein
     qsub_script(
-        write_script(script_path=os.path.join(args.work_dir, 'script', 'translate.sh'), script_text= """\
+        write_script(script_path=os.path.join(work_scripts_dir, 'translate.sh'), script_text= """\
             #!/bin/bash
             source activate mouse
             python {scripts_dir}/translate-microbial-dna-CDS.py \\
@@ -57,45 +66,46 @@ def pipeline():
                 -o {work_dir}/crc-mouse-protein-from-known-only.fa \\
                 -u {work_dir}/crc-mouse-untranslated-microbial-dna-CDS-known.fa \\
                 -l {translation_limit}
-            """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path)
-        ),
-        job_name='translate',
-        select=1,
-        ncpus=1,
-        mem='10gb',
-        pcmem='10gb',
-        walltime='00:05:00',
-        cputime='00:05:00',
-        stderr_fp='mouse_translate.stderr',
-        stdout_fp='mouse_translate.stdout',
-        qsub_params=qsub_params
+            """.format(**vars(args), work_dna_cds_known_path=work_dna_cds_known_path),
+            job_name='crc-mouse-translate',
+            select=1,
+            ncpus=1,
+            mem='10gb',
+            pcmem='10gb',
+            walltime='00:05:00',
+            cputime='00:05:00',
+            stderr_fp='mouse_translate.stderr',
+            stdout_fp='mouse_translate.stdout',
+            qsub_params=qsub_params
+        )
     )
     ###########################################################################
 
     ###########################################################################
     # cluster proteins with CD-HIT
     qsub_script(
-        write_script(script_path=os.path.join(args.work_dir, 'script', 'cluster_proteins.sh'), script_text="""\
+        write_script(script_path=os.path.join(work_scripts_dir, 'cluster_proteins.sh'), script_text="""\
             #!/bin/bash
             module load cd-hit
             cdhit \\
                 -i {work_dir}/crc-mouse-protein-from-known-only.fa \\
                 -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
                 -c 0.9 -n 5 -M 1000 -d 0 -T 0
-            """.format(**vars(args))
-        ),
-        job_name='cdhit',
-        select=1,
-        ncpus=28,
-        mem='168gb',
-        pcmem='6gb',
-        walltime='01:00:00',
-        cputime='28:00:00',
-        stderr_fp='mouse_cluster.stderr',
-        stdout_fp='mouse_cluster.stdout',
-        qsub_params=qsub_params
+            """.format(**vars(args)),
+            job_name='crc-mouse-cdhit',
+            select=1,
+            ncpus=28,
+            mem='168gb',
+            pcmem='6gb',
+            walltime='01:00:00',
+            cputime='28:00:00',
+            stderr_fp='mouse_cluster.stderr',
+            stdout_fp='mouse_cluster.stdout',
+            qsub_params=qsub_params
+        )
     )
     ###########################################################################
+
 
 def get_args():
     arg_parser = argparse.ArgumentParser()
@@ -108,12 +118,29 @@ def get_args():
 
     return arg_parser.parse_args()
 
-def write_script(script_text, script_path):
+
+def write_script(script_path, script_text, **kwargs):
+    print(kwargs)
     with open(script_path, 'wt') as script_file:
-        for line in io.StringIO(script_text):
+        script_text_buffer = io.StringIO(script_text)
+        script_file.write(script_text_buffer.readline().lstrip())
+        script_file.write("""\
+#PBS -N {job_name}
+#PBS -l select={select}:ncpus={ncpus}:mem={mem}:pcmem={pcmem}
+#PBS -l place=pack:shared
+#PBS -l walltime={walltime}
+#PBS -l cputime={cputime}
+#PBS -e {stderr_fp}
+#PBS -o {stdout_fp}
+#PBS -M jklynch@email.arizona.edu
+#PBS -W group_list=bhurwitz
+#PBS -q standard
+""".format(**kwargs))
+        for line in script_text_buffer:
             script_file.write(line.lstrip())
     os.chmod(script_path, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR)
     return script_path
+
 
 def run_script(script_path):
     print('running "{}"'.format(script_path))
@@ -125,24 +152,23 @@ def run_script(script_path):
     print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
     print('stdout:\n{}'.format(p.stdout.decode('utf-8')))
 
-def qsub_script(script_path, job_name, select, ncpus, mem, pcmem, walltime, cputime, stderr_fp, stdout_fp, qsub_params):
+
+def qsub_script(script_path):
     print('qsub "{}"'.format(script_path))
-    subprocess_cmd_list = [
-        'qsub',
-        '-N', job_name,
-        '-l', 'select={}:ncpus={}:mem={}:pcmem={}'.format(select, ncpus, mem, pcmem),
-        '-l', 'walltime={}'.format(walltime),
-        '-l', 'cputime={}'.format(cputime),
-        '-e', stderr_fp,
-        '-o', stdout_fp] + qsub_params + [script_path]
+    subprocess_cmd_list = ['qsub', script_path]
     print(subprocess_cmd_list)
-    p = subprocess.run(
-        subprocess_cmd_list,
-        shell=False,
-        stderr=subprocess.PIPE,
-        stdout=subprocess.PIPE)
-    print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
-    print('stdout:\n{}'.format(p.stdout.decode('utf-8')))
+    try:
+        p = subprocess.run(
+            subprocess_cmd_list,
+            shell=False,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE)
+        print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
+        print('stdout:\n{}'.format(p.stdout.decode('utf-8')))
+    except FileNotFoundError as e:
+        # this usually means I am testing on my laptop
+        print('no qsub executable')
+        run_script(script_path=script_path)
 
 
 if __name__ == '__main__':
