@@ -44,8 +44,8 @@ def pipeline():
                  job_name='crc-mouse-copy',
                  select=1,
                  ncpus=1,
-                 mem='10gb',
-                 pcmem='10gb',
+                 mem='1gb',
+                 pcmem=None,
                  walltime='00:05:00',
                  cputime='00:05:00',
                  stderr_fp='crc-mouse-copy.stderr',
@@ -126,7 +126,8 @@ def write_script(script_path, script_text, **kwargs):
         script_file.write(script_text_buffer.readline().lstrip())
         script_file.write("""\
 #PBS -N {job_name}
-#PBS -l select={select}:ncpus={ncpus}:mem={mem}:pcmem={pcmem}
+#PBS -l jobtype=htc
+#PBS -l select={select}:ncpus={ncpus}:mem={mem}
 #PBS -l place=pack:shared
 #PBS -l walltime={walltime}
 #PBS -l cputime={cputime}
