@@ -44,10 +44,11 @@ def pipeline():
                  job_name='crc-mouse-copy',
                  select=1,
                  ncpus=1,
-                 mem='1gb',
-                 pcmem=None,
-                 walltime='00:05:00',
-                 cputime='00:05:00',
+                 mem='6gb',
+                 pcmem='6gb',
+                 place='free:shared',
+                 walltime='00:10:00',
+                 cputime='00:10:00',
                  stderr_fp='crc-mouse-copy.stderr',
                  stdout_fp='crc-mouse-copy.stdout',
                  qsub_params=qsub_params
@@ -70,10 +71,11 @@ def pipeline():
             job_name='crc-mouse-translate',
             select=1,
             ncpus=1,
-            mem='10gb',
-            pcmem='10gb',
-            walltime='00:05:00',
-            cputime='00:05:00',
+            mem='6gb',
+            pcmem='6gb',
+            place='free:shared',
+            walltime='00:30:00',
+            cputime='00:30:00',
             stderr_fp='mouse_translate.stderr',
             stdout_fp='mouse_translate.stdout',
             qsub_params=qsub_params
@@ -90,13 +92,14 @@ def pipeline():
             cdhit \\
                 -i {work_dir}/crc-mouse-protein-from-known-only.fa \\
                 -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
-                -c 0.9 -n 5 -M 1000 -d 0 -T 0
+                -c 0.9 -n 5 -M 168000 -d 0 -T 28
             """.format(**vars(args)),
             job_name='crc-mouse-cdhit',
             select=1,
             ncpus=28,
             mem='168gb',
             pcmem='6gb',
+            place='pack:free',
             walltime='01:00:00',
             cputime='28:00:00',
             stderr_fp='mouse_cluster.stderr',
@@ -126,16 +129,16 @@ def write_script(script_path, script_text, **kwargs):
         script_file.write(script_text_buffer.readline().lstrip())
         script_file.write("""\
 #PBS -N {job_name}
-#PBS -l jobtype=htc
-#PBS -l select={select}:ncpus={ncpus}:mem={mem}
-#PBS -l place=pack:shared
-#PBS -l walltime={walltime}
+#PBS -q standard
+#PBS -W group_list=bhurwitz
+#PBS -l select={select}:ncpus={ncpus}:mem={mem}:pcmem={pcmem}
+#PBS -l place={place}
 #PBS -l cputime={cputime}
+#PBS -l walltime={walltime}
+#PBS -m bea
+#PBS -M jklynch@email.arizona.edu
 #PBS -e {stderr_fp}
 #PBS -o {stdout_fp}
-#PBS -M jklynch@email.arizona.edu
-#PBS -W group_list=bhurwitz
-#PBS -q standard
 """.format(**kwargs))
         for line in script_text_buffer:
             script_file.write(line.lstrip())
