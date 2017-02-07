@@ -73,9 +73,9 @@ def pipeline():
             ncpus=1,
             mem='6gb',
             pcmem='6gb',
-            place='free:shared',
-            walltime='00:30:00',
-            cput='00:30:00',
+            place='pack:shared',
+            walltime='02:00:00',
+            cput='02:00:00',
             stderr_fp='mouse_translate.stderr',
             stdout_fp='mouse_translate.stdout',
             qsub_params=qsub_params
