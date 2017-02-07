@@ -58,7 +58,7 @@ def pipeline():
 
     ###########################################################################
     # translate dna to protein
-    qsub_script(
+    translate_job_id, _ = qsub_script(
         write_script(script_path=os.path.join(work_scripts_dir, 'translate.sh'), script_text= """\
             #!/bin/bash
             source activate mouse
@@ -84,23 +84,27 @@ def pipeline():
     ###########################################################################
 
     ###########################################################################
-    # cluster proteins with CD-HIT
+    # cluster proteins with CD-
+    #   had to build cd-hit on ocelote
+    #     $ git clone https://github.com/weizhongli/cdhit.git
+    #     $ cd cdhit
+    #     $ make
     qsub_script(
         write_script(script_path=os.path.join(work_scripts_dir, 'cluster_proteins.sh'), script_text="""\
             #!/bin/bash
-            module load cd-hit
-            cdhit \\
+            {cd_hit_bin} \\
                 -i {work_dir}/crc-mouse-protein-from-known-only.fa \\
                 -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
-                -c 0.9 -n 5 -M 168000 -d 0 -T 28
+                -c 0.9 -n 5 -M 168000000 -d 0 -T 28
             """.format(**vars(args)),
+            depend=translate_job_id,
             job_name='crc-mouse-cdhit',
             select=1,
             ncpus=28,
             mem='168gb',
             pcmem='6gb',
-            place='pack:free',
-            walltime='01:00:00',
+            place='pack:shared',
+            walltime='03:00:00',
             cput='28:00:00',
             stderr_fp='mouse_cluster.stderr',
             stdout_fp='mouse_cluster.stdout',
@@ -118,6 +122,7 @@ def get_args():
         '-i', '--orig-dna-cds-known-path',
         default='/rsgrps/bhurwitz/scottdaniel/extract-fasta/data/dna-of-CDS-from-known-only.fa')
     arg_parser.add_argument('-l', '--translation-limit', type=int, default=-1)
+    arg_parser.add_argument('--cd-hit-bin', default='~/local/cdhit/cd-hit')
 
     return arg_parser.parse_args()
 
@@ -140,6 +145,15 @@ def write_script(script_path, script_text, **kwargs):
 #PBS -e {stderr_fp}
 #PBS -o {stdout_fp}
 """.format(**kwargs))
+        if 'depend' in kwargs and kwargs['depend'] is not None:
+            script_file.write("""\
+#PBS -l depend={depend}
+""".format(**kwargs))
+        if 'place' in kwargs and kwargs['place'] is not None:
+            script_file.write("""\
+            #PBS -l place={place}
+""".format(**kwargs))
+
         for line in script_text_buffer:
             script_file.write(line.lstrip())
     os.chmod(script_path, stat.S_IXUSR | stat.S_IRUSR | stat.S_IWUSR)
@@ -167,12 +181,16 @@ def qsub_script(script_path):
             shell=False,
             stderr=subprocess.PIPE,
             stdout=subprocess.PIPE)
+        stderr = p.stderr.decode('utf-8')
+        stdout = p.stdout.decode('utf-8')
         print('stderr:\n{}'.format(p.stderr.decode('utf-8')))
         print('stdout:\n{}'.format(p.stdout.decode('utf-8')))
+        return stdout, stderr
     except FileNotFoundError as e:
         # this usually means I am testing on my laptop
         print('no qsub executable')
         run_script(script_path=script_path)
+        return None, None
 
 
 if __name__ == '__main__':
