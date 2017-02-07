@@ -48,7 +48,7 @@ def pipeline():
                  pcmem='6gb',
                  place='free:shared',
                  walltime='00:10:00',
-                 cputime='00:10:00',
+                 cput='00:10:00',
                  stderr_fp='crc-mouse-copy.stderr',
                  stdout_fp='crc-mouse-copy.stdout',
                  qsub_params=qsub_params
@@ -75,7 +75,7 @@ def pipeline():
             pcmem='6gb',
             place='free:shared',
             walltime='00:30:00',
-            cputime='00:30:00',
+            cput='00:30:00',
             stderr_fp='mouse_translate.stderr',
             stdout_fp='mouse_translate.stdout',
             qsub_params=qsub_params
@@ -101,7 +101,7 @@ def pipeline():
             pcmem='6gb',
             place='pack:free',
             walltime='01:00:00',
-            cputime='28:00:00',
+            cput='28:00:00',
             stderr_fp='mouse_cluster.stderr',
             stdout_fp='mouse_cluster.stdout',
             qsub_params=qsub_params
@@ -133,7 +133,7 @@ def write_script(script_path, script_text, **kwargs):
 #PBS -W group_list=bhurwitz
 #PBS -l select={select}:ncpus={ncpus}:mem={mem}:pcmem={pcmem}
 #PBS -l place={place}
-#PBS -l cputime={cputime}
+#PBS -l cput={cput}
 #PBS -l walltime={walltime}
 #PBS -m bea
 #PBS -M jklynch@email.arizona.edu
