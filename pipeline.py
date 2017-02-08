@@ -85,7 +85,8 @@ def pipeline():
         qsub_params=qsub_params
     )
     if args.submit:
-        translate_job_id, _ = qsub_script(script_path=translate_script_path)
+        qsub_stdout, _ = qsub_script(script_path=translate_script_path)
+        translate_job_id = qsub_stdout.strip()
     else:
         print('"{}" will not be submitted'.format(translate_script_path))
         translate_job_id = None
@@ -107,7 +108,7 @@ def pipeline():
             -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
             -c 0.9 -n 5 -M 168000000 -d 0 -T 28
         """.format(**vars(args)),
-        depend=translate_job_id,
+        depend='afterok:' + translate_job_id,
         job_name='crc-mouse-cdhit',
         select=1,
         ncpus=28,
@@ -164,7 +165,7 @@ def write_script(script_path, script_text, **kwargs):
 """.format(**kwargs))
         if 'depend' in kwargs and kwargs['depend'] is not None:
             script_file.write("""\
-#PBS -l depend={depend}
+#PBS -W depend={depend}
 """.format(**kwargs))
         if 'place' in kwargs and kwargs['place'] is not None:
             script_file.write("""\
