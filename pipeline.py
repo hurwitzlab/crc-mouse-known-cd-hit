@@ -46,7 +46,7 @@ def pipeline():
              ncpus=1,
              mem='6gb',
              pcmem='6gb',
-             place='free:shared',
+             place='pack:shared',
              walltime='00:10:00',
              cput='00:10:00',
              stderr_fp='crc-mouse-copy.stderr',
