@@ -61,6 +61,7 @@ def pipeline():
 
     ###########################################################################
     # translate dna to protein
+    # this job ran in 00:42:31 on ocelote
     translate_script_path = os.path.join(work_scripts_dir, 'translate.sh')
     write_script(script_path=translate_script_path, script_text= """\
         #!/bin/bash
@@ -77,25 +78,28 @@ def pipeline():
         mem='6gb',
         pcmem='6gb',
         place='pack:shared',
-        walltime='02:00:00',
-        cput='02:00:00',
+        walltime='01:00:00',
+        cput='01:00:00',
         stderr_fp='mouse_translate.stderr',
         stdout_fp='mouse_translate.stdout',
         qsub_params=qsub_params
     )
     if args.submit:
-        translate_job_id, _ = qsub_script(script_path=translate_script_path)
+        qsub_stdout, _ = qsub_script(script_path=translate_script_path)
+        translate_job_id = qsub_stdout.strip()
     else:
         print('"{}" will not be submitted'.format(translate_script_path))
         translate_job_id = None
     ###########################################################################
 
     ###########################################################################
-    # cluster proteins with CD-
+    # cluster proteins with CD-HIT
     #   had to build cd-hit on ocelote
     #     $ git clone https://github.com/weizhongli/cdhit.git
     #     $ cd cdhit
     #     $ make
+    # this job ran in 00:19:50 (06:46:32 cput) on one node of ocelote (28 cores)
+    #   cput does not match up with walltime
     cluster_script_path = os.path.join(work_scripts_dir, 'cluster_proteins.sh')
     write_script(script_path=cluster_script_path, script_text="""\
         #!/bin/bash
@@ -104,15 +108,15 @@ def pipeline():
             -o {work_dir}/crc-mouse-cd-hit-c90-n5-protein-known.db \\
             -c 0.9 -n 5 -M 168000000 -d 0 -T 28
         """.format(**vars(args)),
-        depend=translate_job_id,
+        depend='afterok:' + translate_job_id,
         job_name='crc-mouse-cdhit',
         select=1,
         ncpus=28,
         mem='168gb',
         pcmem='6gb',
         place='pack:shared',
-        walltime='03:00:00',
-        cput='28:00:00',
+        walltime='00:30:00',
+        cput='14:00:00',
         stderr_fp='mouse_cluster.stderr',
         stdout_fp='mouse_cluster.stdout',
         qsub_params=qsub_params
@@ -161,7 +165,7 @@ def write_script(script_path, script_text, **kwargs):
 """.format(**kwargs))
         if 'depend' in kwargs and kwargs['depend'] is not None:
             script_file.write("""\
-#PBS -l depend={depend}
+#PBS -W depend={depend}
 """.format(**kwargs))
         if 'place' in kwargs and kwargs['place'] is not None:
             script_file.write("""\
